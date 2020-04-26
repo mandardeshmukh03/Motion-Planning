@@ -1,4 +1,17 @@
 #use for the main code after refining and testing.
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Apr 18 16:16:54 2020
+
+@author: Mandar
+"""
+
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Apr 15 21:30:02 2020
+
+@author: Mandar
+"""
 
 import random
 import math
@@ -28,23 +41,26 @@ class RRT():
     Class for RRT Planning
     """
 
-    def __init__(self, start, goal_1, obstacleList,
-                 randArea, expandDis=5.0, goalSampleRate=15, maxIter=500):
+    def __init__(self, start, goal,s_obst, obstacleList,
+                 randArea, expandDis=5.0, goalSampleRate=15, maxIter=10000):
         """
         Setting Parameter
         start:Start Position [x,y]
         goal:Goal Position [x,y]
         obstacleList:obstacle Positions [[x,y,size],...]
+        s_obst: static obstacle Positions [[x,y,size],...]
         randArea:Ramdom Samping Area [min,max]
         """
         self.start = Node(start[0], start[1])
-        self.end = Node(goal_1[0], goal_1[1])
+        self.end = Node(goal[0], goal[1])
         self.Xrand = randArea[0]
         self.Yrand = randArea[1]
         self.expandDis = expandDis
         self.goalSampleRate = goalSampleRate
         self.maxIter = maxIter
         self.obstacleList = obstacleList
+        self.s_obst = s_obst
+    
 
     def Planning(self, animation=True):
         """
@@ -52,10 +68,10 @@ class RRT():
         animation: flag for animation on or off
         """
         self.nodeList = {0: self.start}
-        i = 0
+        i = 0 
         t = 0
         m = 4
-        change = 1
+        change = 20
 
         cnt = 0
 #        maxCnt = 50
@@ -79,15 +95,16 @@ class RRT():
             #     cnt = cnt + 5
             #     self.obstacleList = [(xt + 5, yt + 5, sizet) for (xt, yt, sizet) in self.obstacleList ]
 
-            self.obstacleList = [(xt + change, yt + change, sizet) for (xt, yt, sizet) in self.obstacleList]
+            self.obstacleList = [(xt + change, yt, sizet) for (xt, yt, sizet) in self.obstacleList]
             cnt = cnt + change
-            if cnt > 500:
+            if cnt > 300:
                 change = -change
-            elif cnt < -500:
+            elif cnt < -300:
                 change = -change
+            
             #print("cnt = = = ", cnt, " | ", self.obstacleList)
 
-            if self.__CollisionCheck(newNode, self.obstacleList):  # if it does not collide
+            if self.__CollisionCheck(newNode, self.obstacleList,self.s_obst):  # if it does not collide
                 nearinds = self.find_near_nodes(newNode, 5)  # find nearest nodes to newNode
                 newNode = self.choose_parent(newNode,
                                              nearinds)  # from that nearest nodes find the best parent to newNode
@@ -175,7 +192,7 @@ class RRT():
         return newNode
 
     def get_random_point(self):
-        if random.randint(0, 100) > self.goalSampleRate:
+        if random.randint(0, 1000) > self.goalSampleRate:
             rnd = [random.uniform(0, self.Xrand), random.uniform(0, self.Yrand)]
         else:  # goal point sampling
             rnd = [self.end.x, self.end.y]
@@ -246,10 +263,17 @@ class RRT():
         for i in range(int(d / self.expandDis)):
             tmpNode.x += self.expandDis * math.cos(theta)
             tmpNode.y += self.expandDis * math.sin(theta)
-            if not self.__CollisionCheck(tmpNode, self.obstacleList):
+            if not self.__CollisionCheck(tmpNode, self.obstacleList,self.s_obst): #or  not self.__CollisionCheck(tmpNode, self.s_obst):
                 return False
 
         return True
+#        for i in range(int(d / self.expandDis)):
+#            tmpNode.x += self.expandDis * math.cos(theta)
+#            tmpNode.y += self.expandDis * math.sin(theta)
+#            if not self.__CollisionCheck(tmpNode, self.s_obst):
+#                return False
+#
+#        return True
 
     def DrawGraph(self, rnd=None):
         u"""
@@ -268,6 +292,8 @@ class RRT():
 
         for (ox, oy, size) in self.obstacleList:
             pygame.draw.circle(screen, (0, 0, 0), [ox, oy], size)
+        for (ox, oy, size) in self.s_obst:
+            pygame.draw.circle(screen, (0, 0, 0), [ox, oy], size)     
 
         pygame.draw.circle(screen, (255, 0, 0), [self.start.x, self.start.y], 10)
         pygame.draw.circle(screen, (0, 0, 255), [self.end.x, self.end.y], 10)
@@ -289,17 +315,45 @@ class RRT():
         minind = min(dlist, key=lambda d: d[1])
         return minind[0]
 
-    def __CollisionCheck(self, node, obstacleList):
-        for (ox, oy, size) in obstacleList:
+#    def __CollisionCheck(self, node, obstacleList,s_obst):
+#        for (xt, yt, sizet) in obstacleList:
+#            dx = xt - node.x
+#            dy = yt - node.y
+#            d = dx * dx + dy * dy
+#            if d <= sizet ** 2:
+#                return False  # collision
+#
+#        return True # safe
+#        for (ox, oy, size) in s_obst:
+#            dx = ox - node.x
+#            dy = oy - node.y
+#            d = dx * dx + dy * dy
+#            if d <= size ** 2:
+#                return False
+#        return True
+        
+    def __CollisionCheck(self, node, obstacleList,s_obst):
+        safe_d = 1 
+        safe_s = 1
+        for (xt, yt, sizet) in obstacleList:
+            dx = xt - node.x
+            dy = yt - node.y
+            d = dx * dx + dy * dy
+#            if d <= sizet ** 2:
+#                safe_d = 0
+        for (ox, oy, size) in s_obst:
             dx = ox - node.x
             dy = oy - node.y
             d = dx * dx + dy * dy
-            if d <= size ** 2:
-                return False  # collision
-
-        return True  # safe
-
-
+        if (d <= size ** 2) or (d <= sizet ** 2) :
+                safe_d = 0
+                safe_s = 0
+        if (safe_d == 1) or (safe_s == 1):
+                    return True
+        else:
+                return False
+        
+        
 class Node():
     """
     RRT Node
@@ -315,9 +369,15 @@ class Node():
 
 def main():
     print("start RRT path planning")
+    
 
-    obstacleList = [(150, 200, 10),(50, 50, 10), (400, 200, 15), (400, 250, 25),
-                    (300, 180, 20), (50, 300, 50)]
+    obstacleList = [(150, 200, 10), (400, 200, 15), #(400, 250, 25),
+                     (300, 120, 50)]
+    s_obst = [(50, 50, 10),(700, 380, 20),(460,300,30)]
+    
+
+           
+        
     # obstacleList = [(50, 50, 10)] #, (400, 200, 15), (400, 250, 25),
                     # (300, 180, 20), (50, 300, 50)]
 
@@ -330,8 +390,8 @@ def main():
     # [x,y,size]
     # Set Initial parameters
 
-    rrt_1 = RRT(start=[1, 0], goal_1=[450, 300],
-                randArea=[XDIM, YDIM], obstacleList=obstacleList)
+    rrt_1 = RRT(start=[10, 10], goal=[300,450],
+                randArea=[XDIM, YDIM],s_obst = s_obst,obstacleList=obstacleList)
     path = rrt_1.Planning(animation=show_animation)
 
     # Draw final path
